@@ -16,7 +16,7 @@ Ikuti langkah-langkah dibawah untuk memulai instalasi dan pengembangan projek
 
 ### Git Clone
  ```sh
-  https://github.com/SISAPPMA/Server-Side.git
+  [https://github.com/SISAPPMA/Server-Side.git](https://github.com/Putra2203/Server-Side.git)
   ```
 ### Installing modules
 Ketikkan perintah dibawah ini melalui terminal dari direktori folder yang sudah di git clone
