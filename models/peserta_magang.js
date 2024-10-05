@@ -29,7 +29,13 @@ module.exports = (sequelize, DataTypes) => {
     no_telp_dosen : DataTypes.STRING,
     tanggal_mulai: DataTypes.DATEONLY,
     tanggal_selesai: DataTypes.DATEONLY,
-    status_aktif: DataTypes.INTEGER,
+    status_aktif: {
+      type: DataTypes.INTEGER, 
+      allowNull: false,       
+      validate: {
+        isIn: [[1, 2, 3]],
+      }
+    },
     foto_profil: DataTypes.STRING,
     username: DataTypes.STRING,
     password: DataTypes.STRING,
