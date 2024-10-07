@@ -1,7 +1,6 @@
 'use strict';
-const {
-  Model
-} = require('sequelize');
+const { Model } = require('sequelize');
+
 module.exports = (sequelize, DataTypes) => {
   class Presensi extends Model {
     /**
@@ -10,12 +9,14 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      // Presensi.belongsTo(models.Pesertas, {
-      //   foreignKey: 'p_id', // Name of the foreign key in Presensi table
-      //   as: 'peserta_Magang', // Alias for the association
-      // });
+      // Menambahkan relasi belongsTo dengan model Pesertas (Pengguna)
+      Presensi.belongsTo(models.Peserta_Magang, {
+        foreignKey: 'p_id', // Kolom foreign key di tabel Presensi
+        as: 'peserta_magang', // Alias untuk relasi, bisa digunakan saat include
+      });
     }
   }
+  
   Presensi.init({
     tanggal: DataTypes.DATEONLY,
     check_in: DataTypes.DATE,
@@ -27,5 +28,6 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'Presensi',
   });
+  
   return Presensi;
 };

@@ -17,7 +17,7 @@ router.patch("/tugas/:id/submit/:tid", checkAuthMiddleware.checkAuth('peserta_ma
       const uploadedFileUrl = req.file.path;
       userController.doTugas(req,res,uploadedFileUrl);
 }); //cek token
-router.get('/presensi/:id', checkAuthMiddleware.checkAuth('peserta_magang'), userController.showPresensi); //cek token
+router.get('/presensi/:id', checkAuthMiddleware.checkAuth('peserta_magang'), userController.showPresensi);
 router.patch('/presensi/:id/up', uploadProtectionMiddleware.protectUpload, async (req, res) => {
 
   imageUploader.upload.single('image')(req, res, (err) => {

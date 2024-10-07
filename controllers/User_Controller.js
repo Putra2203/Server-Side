@@ -48,24 +48,53 @@ function showTugas(req, res){
     });
 }
 
-function showPresensi(req, res){
+function showPresensi(req, res) {
     const id = req.params.id;
-    if (true){
-        models.Presensi.findAll({where:{p_id:id}}).then(result =>{
-            res.status(200).json({
-                presensi:result
+
+    // Mengambil semua presensi berdasarkan p_id dengan join ke tabel Pesertas (User)
+    models.Presensi.findAll({
+        where: { p_id: id },
+        include: [
+            {
+                model: models.Peserta_Magang, // Asumsikan model pengguna adalah 'Pesertas'
+                as: 'peserta_magang', // Alias untuk relasi
+                attributes: ['nama'], // Hanya ambil atribut nama dari tabel Pesertas
+            },
+        ],
+    })
+    .then(result => {
+        if (result.length === 0) {
+            return res.status(404).json({
+                message: "Data presensi tidak ditemukan",
             });
-    }).catch(error =>{
+        }
+
+        // Memformat data presensi untuk menampilkan hari dan jam
+        const formattedPresensi = result.map(presensi => {
+            const checkInTime = presensi.check_in ? moment(presensi.check_in).format('HH:mm:ss') : null;
+            const checkOutTime = presensi.check_out ? moment(presensi.check_out).format('HH:mm:ss') : null;
+            const hari = moment(presensi.tanggal).format('dddd'); // Mendapatkan nama hari (misalnya: Senin, Selasa)
+
+            return {
+                nama: presensi.peserta_magang.nama, // Nama peserta
+                tanggal: moment(presensi.tanggal).format('YYYY-MM-DD'), // Tanggal presensi
+                hari: hari, // Hari presensi
+                check_in: checkInTime, // Waktu check-in
+                check_out: checkOutTime, // Waktu check-out
+            };
+        });
+
+        // Mengirimkan respons dengan data presensi yang telah diformat
+        res.status(200).json({
+            presensi: formattedPresensi,
+        });
+    })
+    .catch(error => {
         res.status(500).json({
             message: "Something went wrong",
-            error:error
+            error: error,
         });
     });
-    }else{
-        res.status(403).json({
-            message: "bukan id kamu"
-        })
-    }
 }
 
 async function doPresensi(req, res, url) {
