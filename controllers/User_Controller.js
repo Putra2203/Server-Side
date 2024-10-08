@@ -78,7 +78,17 @@ function showPresensi(req, res) {
 
   models.Presensi.findAll({
     where: { p_id: id },
-    attributes: ['check_in', 'check_out', 'tanggal', 'image_url_in', 'image_url_out', 'lokasi_in', 'lokasi_out'],
+    attributes: [
+      "check_in",
+      "check_out",
+      "tanggal",
+      "image_url_in",
+      "image_url_out",
+      "latitude_in",
+      "longitude_in",
+      "latitude_out",
+      "longitude_out",
+    ],
     include: [
       {
         model: models.Peserta_Magang,
@@ -103,6 +113,14 @@ function showPresensi(req, res) {
           : null;
         const hari = moment(presensi.tanggal).format("dddd");
 
+        const lokasiIn = presensi.latitude_in && presensi.longitude_in
+          ? `${presensi.latitude_in}, ${presensi.longitude_in}`
+          : "Lokasi tidak tersedia";
+
+        const lokasiOut = presensi.latitude_out && presensi.longitude_out
+          ? `${presensi.latitude_out}, ${presensi.longitude_out}`
+          : "Lokasi tidak tersedia";
+
         return {
           nama: presensi.peserta_magang.nama,
           tanggal: moment(presensi.tanggal).format("YYYY-MM-DD"),
@@ -111,8 +129,8 @@ function showPresensi(req, res) {
           check_out: checkOutTime,
           image_url_in: presensi.image_url_in || null,
           image_url_out: presensi.image_url_out || null,
-          lokasi_in: presensi.lokasi_in || "Lokasi tidak tersedia",
-          lokasi_out: presensi.lokasi_out || "Lokasi tidak tersedia",
+          lokasi_in: lokasiIn,
+          lokasi_out: lokasiOut,
         };
       });
 
@@ -128,9 +146,12 @@ function showPresensi(req, res) {
     });
 }
 
+
 async function doPresensi(req, res, url) {
   try {
-    const response = await axios.get("https://worldtimeapi.org/api/timezone/Asia/Jakarta");
+    const response = await axios.get(
+      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
+    );
     const time = moment.tz(response.data.datetime, "Asia/Jakarta");
     const pid = req.params.id;
     const baseUrl = "http://localhost:3000/";
@@ -143,7 +164,12 @@ async function doPresensi(req, res, url) {
       });
     }
 
-    const distance = getDistance(latitude, longitude, allowedLatitude, allowedLongitude);
+    const distance = getDistance(
+      latitude,
+      longitude,
+      allowedLatitude,
+      allowedLongitude
+    );
 
     if (distance > allowedRadius) {
       return res.status(400).json({
@@ -190,38 +216,62 @@ async function doPresensi(req, res, url) {
 
     if (hari === 5) {
       if (
-        isInRange(jamMulai1Jumat, menitMulai1Jumat, jamBerakhir1Jumat, menitBerakhir1Jumat)
+        isInRange(
+          jamMulai1Jumat,
+          menitMulai1Jumat,
+          jamBerakhir1Jumat,
+          menitBerakhir1Jumat
+        )
       ) {
         presensi = {
           check_in: currentDate,
           image_url_in: baseUrl + fileName,
-          lokasi_in: `${latitude},${longitude}`,
+          latitude_in: latitude,
+          longitude_in: longitude,
         };
       } else if (
-        isInRange(jamMulai2Jumat, menitMulai2Jumat, jamBerakhir2Jumat, menitBerakhir2Jumat)
+        isInRange(
+          jamMulai2Jumat,
+          menitMulai2Jumat,
+          jamBerakhir2Jumat,
+          menitBerakhir2Jumat
+        )
       ) {
         presensi = {
           check_out: currentDate,
           image_url_out: baseUrl + fileName,
-          lokasi_out: `${latitude},${longitude}`,
+          latitude_out: latitude,
+          longitude_out: longitude,
         };
       }
     } else if (hari !== 0 && hari !== 6) {
       if (
-        isInRange(jamMulai1Senmis, menitMulai1Senmis, jamBerakhir1Senmis, menitBerakhir1Senmis)
+        isInRange(
+          jamMulai1Senmis,
+          menitMulai1Senmis,
+          jamBerakhir1Senmis,
+          menitBerakhir1Senmis
+        )
       ) {
         presensi = {
           check_in: currentDate,
           image_url_in: baseUrl + fileName,
-          lokasi_in: `${latitude},${longitude}`,
+          latitude_in: latitude,
+          longitude_in: longitude,
         };
       } else if (
-        isInRange(jamMulai2Senmis, menitMulai2Senmis, jamBerakhir2Senmis, menitBerakhir2Senmis)
+        isInRange(
+          jamMulai2Senmis,
+          menitMulai2Senmis,
+          jamBerakhir2Senmis,
+          menitBerakhir2Senmis
+        )
       ) {
         presensi = {
           check_out: currentDate,
           image_url_out: baseUrl + fileName,
-          lokasi_out: `${latitude},${longitude}`,
+          latitude_out: latitude,
+          longitude_out: longitude,
         };
       }
     }
