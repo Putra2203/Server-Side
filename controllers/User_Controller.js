@@ -6,6 +6,27 @@ const Validator = require("fastest-validator");
 const { where } = require("sequelize");
 const fs = require("fs");
 
+const allowedLatitude = -6.983066906515344;
+const allowedLongitude = 110.41367971193375;
+const allowedRadius = 1500; // radius in meters
+
+// Fungsi untuk menghitung jarak menggunakan rumus Haversine
+function getDistance(lat1, lon1, lat2, lon2) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const R = 6371e3; // Radius bumi dalam meter
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δφ = toRad(lat2 - lat1);
+  const Δλ = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Jarak dalam meter
+}
+
 function showTugasList(req, res) {
   const id = req.params.id;
   models.Status_tugas.findAll({
@@ -23,8 +44,7 @@ function showTugasList(req, res) {
         tugas: result.map((item) => ({
           tugas: item.tugas,
           status_tugas: {
-            keterangan: item.keterangan, // Include keterangan property
-            // ... other properties
+            keterangan: item.keterangan,
           },
         })),
       });
@@ -56,15 +76,14 @@ function showTugas(req, res) {
 function showPresensi(req, res) {
   const id = req.params.id;
 
-  // Mengambil semua presensi berdasarkan p_id dengan join ke tabel Pesertas (User)
   models.Presensi.findAll({
     where: { p_id: id },
-    attributes: ['check_in', 'check_out', 'tanggal', 'image_url_in', 'image_url_out'], // Tambahkan image_url_in dan image_url_out
+    attributes: ['check_in', 'check_out', 'tanggal', 'image_url_in', 'image_url_out', 'lokasi_in', 'lokasi_out'],
     include: [
       {
-        model: models.Peserta_Magang, // Asumsikan model pengguna adalah 'Peserta_Magang'
-        as: "peserta_magang", // Alias untuk relasi
-        attributes: ["nama"], // Hanya ambil atribut nama dari tabel Peserta_Magang
+        model: models.Peserta_Magang,
+        as: "peserta_magang",
+        attributes: ["nama"],
       },
     ],
   })
@@ -75,7 +94,6 @@ function showPresensi(req, res) {
         });
       }
 
-      // Memformat data presensi untuk menampilkan hari, jam, dan gambar
       const formattedPresensi = result.map((presensi) => {
         const checkInTime = presensi.check_in
           ? moment(presensi.check_in).format("HH:mm:ss")
@@ -83,20 +101,21 @@ function showPresensi(req, res) {
         const checkOutTime = presensi.check_out
           ? moment(presensi.check_out).format("HH:mm:ss")
           : null;
-        const hari = moment(presensi.tanggal).format("dddd"); // Mendapatkan nama hari (misalnya: Senin, Selasa)
+        const hari = moment(presensi.tanggal).format("dddd");
 
         return {
-          nama: presensi.peserta_magang.nama, // Nama peserta
-          tanggal: moment(presensi.tanggal).format("YYYY-MM-DD"), // Tanggal presensi
-          hari: hari, // Hari presensi
-          check_in: checkInTime, // Waktu check-in
-          check_out: checkOutTime, // Waktu check-out
-          image_url_in: presensi.image_url_in || null, // Gambar check-in
-          image_url_out: presensi.image_url_out || null, // Gambar check-out
+          nama: presensi.peserta_magang.nama,
+          tanggal: moment(presensi.tanggal).format("YYYY-MM-DD"),
+          hari: hari,
+          check_in: checkInTime,
+          check_out: checkOutTime,
+          image_url_in: presensi.image_url_in || null,
+          image_url_out: presensi.image_url_out || null,
+          lokasi_in: presensi.lokasi_in || "Lokasi tidak tersedia",
+          lokasi_out: presensi.lokasi_out || "Lokasi tidak tersedia",
         };
       });
 
-      // Mengirimkan respons dengan data presensi yang telah diformat
       res.status(200).json({
         presensi: formattedPresensi,
       });
@@ -111,13 +130,27 @@ function showPresensi(req, res) {
 
 async function doPresensi(req, res, url) {
   try {
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
+    const response = await axios.get("https://worldtimeapi.org/api/timezone/Asia/Jakarta");
     const time = moment.tz(response.data.datetime, "Asia/Jakarta");
     const pid = req.params.id;
     const baseUrl = "http://localhost:3000/";
     const fileName = url.replace("\\", "/");
+    const { latitude, longitude } = req.body;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        message: "Lokasi tidak ditemukan. Mohon izinkan akses GPS Anda.",
+      });
+    }
+
+    const distance = getDistance(latitude, longitude, allowedLatitude, allowedLongitude);
+
+    if (distance > allowedRadius) {
+      return res.status(400).json({
+        message: `Anda berada di luar radius ${allowedRadius} meter dari lokasi yang diizinkan.`,
+      });
+    }
+
     const hari = time.day();
     const currentDate = moment(time);
 
@@ -157,54 +190,38 @@ async function doPresensi(req, res, url) {
 
     if (hari === 5) {
       if (
-        isInRange(
-          jamMulai1Jumat,
-          menitMulai1Jumat,
-          jamBerakhir1Jumat,
-          menitBerakhir1Jumat
-        )
+        isInRange(jamMulai1Jumat, menitMulai1Jumat, jamBerakhir1Jumat, menitBerakhir1Jumat)
       ) {
         presensi = {
           check_in: currentDate,
           image_url_in: baseUrl + fileName,
+          lokasi_in: `${latitude},${longitude}`,
         };
       } else if (
-        isInRange(
-          jamMulai2Jumat,
-          menitMulai2Jumat,
-          jamBerakhir2Jumat,
-          menitBerakhir2Jumat
-        )
+        isInRange(jamMulai2Jumat, menitMulai2Jumat, jamBerakhir2Jumat, menitBerakhir2Jumat)
       ) {
         presensi = {
           check_out: currentDate,
           image_url_out: baseUrl + fileName,
+          lokasi_out: `${latitude},${longitude}`,
         };
       }
     } else if (hari !== 0 && hari !== 6) {
       if (
-        isInRange(
-          jamMulai1Senmis,
-          menitMulai1Senmis,
-          jamBerakhir1Senmis,
-          menitBerakhir1Senmis
-        )
+        isInRange(jamMulai1Senmis, menitMulai1Senmis, jamBerakhir1Senmis, menitBerakhir1Senmis)
       ) {
         presensi = {
           check_in: currentDate,
           image_url_in: baseUrl + fileName,
+          lokasi_in: `${latitude},${longitude}`,
         };
       } else if (
-        isInRange(
-          jamMulai2Senmis,
-          menitMulai2Senmis,
-          jamBerakhir2Senmis,
-          menitBerakhir2Senmis
-        )
+        isInRange(jamMulai2Senmis, menitMulai2Senmis, jamBerakhir2Senmis, menitBerakhir2Senmis)
       ) {
         presensi = {
           check_out: currentDate,
           image_url_out: baseUrl + fileName,
+          lokasi_out: `${latitude},${longitude}`,
         };
       }
     }
@@ -246,7 +263,6 @@ function doTugas(req, res, url) {
   const baseUrl = "http://localhost:3000/";
   const fileName = url.replace("\\", "/");
 
-  // Mengambil informasi tugas
   models.Tugas.findByPk(tid)
     .then((assignment) => {
       if (!assignment) {
@@ -258,22 +274,18 @@ function doTugas(req, res, url) {
       const tugas = {
         tugas_url: baseUrl + fileName,
         status_pengerjaan: true,
-        keterangan: null, //Kondisi awal saat tugas belum dikumpulkan
+        keterangan: null,
       };
 
-      // Variabel pembanding antara waktu sekarang dan deadline
       const currentDateTime = new Date();
       const dueDateTime = new Date(assignment.dueDate);
 
       if (currentDateTime > dueDateTime) {
-        // telat
         tugas.keterangan = 0;
       } else {
-        // sebelum deadline
         tugas.keterangan = 1;
       }
 
-      // melakukan update terhadap status_tugas di database
       models.Status_tugas.update(tugas, { where: { p_id: id, t_id: tid } })
         .then((result) => {
           res.status(201).json({
@@ -385,7 +397,6 @@ async function editFotoProfil(req, res) {
     const id = req.params.id;
 
     if (!filePath) {
-      console.log(!filePath);
       return res.status(304).json();
     }
 
@@ -413,7 +424,7 @@ async function editFotoProfil(req, res) {
 
     models.Peserta_Magang.update(data, {
       where: { id },
-    }).then((result) => {
+    }).then(() => {
       res.status(200).json({
         message: "Profile Picture Updated Successfully",
       });
@@ -432,7 +443,6 @@ async function editFotoProfil(req, res) {
 async function deleteFotoProfil(req, res) {
   try {
     const id = req.params.id;
-
     const baseUrl = "http://localhost:3000/";
     const prevPictPath = await models.Peserta_Magang.findByPk(id);
     const path = prevPictPath.foto_profil.replace(baseUrl, "./");
@@ -455,7 +465,7 @@ async function deleteFotoProfil(req, res) {
       {
         where: { id },
       }
-    ).then((result) => {
+    ).then(() => {
       res.status(200).json({
         message: "Profile Picture Deleted",
       });

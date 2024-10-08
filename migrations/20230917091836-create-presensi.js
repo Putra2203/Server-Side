@@ -7,43 +7,49 @@ module.exports = {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        type: Sequelize.INTEGER,
       },
       tanggal: {
-        type: Sequelize.DATEONLY
+        type: Sequelize.DATEONLY,
       },
       check_in: {
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       check_out: {
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       image_url_in: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       image_url_out: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
+      },
+      lokasi_in: {
+        type: Sequelize.STRING, // Menyimpan koordinat lokasi check-in
+      },
+      lokasi_out: {
+        type: Sequelize.STRING, // Menyimpan koordinat lokasi check-out
       },
       p_id: {
         type: Sequelize.INTEGER,
         references: {
-          model: 'Peserta_Magangs', // Nama tabel lain yang akan dijadikan referensi
-          key: 'id',          // Nama kolom yang akan dijadikan referensi
+          model: 'Peserta_Magangs',
+          key: 'id',
         },
-        onDelete: 'CASCADE',   // Opsi ketika data di tabel referensi dihapus
-        onUpdate: 'CASCADE',   // Opsi ketika data di tabel referensi diperbarui
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
       },
       createdAt: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       updatedAt: {
         allowNull: false,
-        type: Sequelize.DATE
-      }
+        type: Sequelize.DATE,
+      },
     });
   },
   async down(queryInterface, Sequelize) {
     await queryInterface.dropTable('Presensis');
-  }
+  },
 };
