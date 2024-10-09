@@ -156,26 +156,7 @@ async function doPresensi(req, res, url) {
     const pid = req.params.id;
     const baseUrl = "http://localhost:3000/";
     const fileName = url.replace("\\", "/");
-    const { latitude, longitude } = req.body;
-
-    if (!latitude || !longitude) {
-      return res.status(400).json({
-        message: "Lokasi tidak ditemukan. Mohon izinkan akses GPS Anda.",
-      });
-    }
-
-    const distance = getDistance(
-      latitude,
-      longitude,
-      allowedLatitude,
-      allowedLongitude
-    );
-
-    if (distance > allowedRadius) {
-      return res.status(400).json({
-        message: `Anda berada di luar radius ${allowedRadius} meter dari lokasi yang diizinkan.`,
-      });
-    }
+    const { latitude, longitude } = req.body; // Mengambil latitude dan longitude
 
     const hari = time.day();
     const currentDate = moment(time);
@@ -192,7 +173,7 @@ async function doPresensi(req, res, url) {
 
     const jamMulai1Senmis = 7;
     const menitMulai1Senmis = 45;
-    const jamBerakhir1Senmis = 8;
+    const jamBerakhir1Senmis = 13;
     const menitBerakhir1Senmis = 15;
 
     const jamMulai2Senmis = 15;
@@ -201,7 +182,6 @@ async function doPresensi(req, res, url) {
     const menitBerakhir2Senmis = 15;
 
     let presensi = {};
-
     const currentHour = currentDate.hours();
     const currentMinute = currentDate.minutes();
 
@@ -226,8 +206,8 @@ async function doPresensi(req, res, url) {
         presensi = {
           check_in: currentDate,
           image_url_in: baseUrl + fileName,
-          latitude_in: latitude,
-          longitude_in: longitude,
+          latitude_in: latitude, // Menambahkan latitude_in
+          longitude_in: longitude, // Menambahkan longitude_in
         };
       } else if (
         isInRange(
@@ -240,8 +220,8 @@ async function doPresensi(req, res, url) {
         presensi = {
           check_out: currentDate,
           image_url_out: baseUrl + fileName,
-          latitude_out: latitude,
-          longitude_out: longitude,
+          latitude_out: latitude, // Menambahkan latitude_out
+          longitude_out: longitude, // Menambahkan longitude_out
         };
       }
     } else if (hari !== 0 && hari !== 6) {
@@ -256,8 +236,8 @@ async function doPresensi(req, res, url) {
         presensi = {
           check_in: currentDate,
           image_url_in: baseUrl + fileName,
-          latitude_in: latitude,
-          longitude_in: longitude,
+          latitude_in: latitude, // Menambahkan latitude_in
+          longitude_in: longitude, // Menambahkan longitude_in
         };
       } else if (
         isInRange(
@@ -270,8 +250,8 @@ async function doPresensi(req, res, url) {
         presensi = {
           check_out: currentDate,
           image_url_out: baseUrl + fileName,
-          latitude_out: latitude,
-          longitude_out: longitude,
+          latitude_out: latitude, // Menambahkan latitude_out
+          longitude_out: longitude, // Menambahkan longitude_out
         };
       }
     }
@@ -531,6 +511,44 @@ async function deleteFotoProfil(req, res) {
   }
 }
 
+function hitungSisaWaktuMagang(req, res) {
+  const id = req.params.id;
+
+  // Cari data peserta magang berdasarkan id
+  models.Peserta_Magang.findByPk(id)
+    .then((peserta) => {
+      if (!peserta) {
+        return res.status(404).json({
+          message: "Peserta magang tidak ditemukan",
+        });
+      }
+
+      const tanggalMulai = moment(peserta.tanggal_mulai);
+      const tanggalSelesai = moment(peserta.tanggal_selesai);
+      const tanggalHariIni = moment();
+
+      // Hitung sisa waktu magang
+      const sisaWaktu = tanggalSelesai.diff(tanggalHariIni, 'days'); // Menghitung selisih hari
+
+      // Jika sisa waktu negatif (artinya sudah lewat), set menjadi 0
+      const sisaHari = sisaWaktu > 0 ? sisaWaktu : 0;
+
+      res.status(200).json({
+        message: `Sisa waktu magang: ${sisaHari} hari`,
+        sisaWaktu: sisaHari,
+        tanggal_mulai: tanggalMulai.format('YYYY-MM-DD'),
+        tanggal_selesai: tanggalSelesai.format('YYYY-MM-DD'),
+      });
+    })
+    .catch((error) => {
+      res.status(500).json({
+        message: "Terjadi kesalahan saat menghitung sisa waktu magang",
+        error: error.message,
+      });
+    });
+}
+
+
 module.exports = {
   showTugasList: showTugasList,
   showTugas: showTugas,
@@ -541,4 +559,5 @@ module.exports = {
   editProfil,
   editFotoProfil,
   deleteFotoProfil,
+  hitungSisaWaktuMagang,
 };
