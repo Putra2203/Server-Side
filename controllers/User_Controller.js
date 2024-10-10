@@ -93,7 +93,7 @@ function showPresensi(req, res) {
       {
         model: models.Peserta_Magang,
         as: "peserta_magang",
-        attributes: ["nama"],
+        attributes: ["nama", "asal_univ", "asal_jurusan", "no_telp"],
       },
     ],
   })
@@ -172,14 +172,14 @@ async function doPresensi(req, res, url) {
     const menitBerakhir2Jumat = 15;
 
     const jamMulai1Senmis = 7;
-    const menitMulai1Senmis = 45;
-    const jamBerakhir1Senmis = 13;
-    const menitBerakhir1Senmis = 15;
+    const menitMulai1Senmis = 20;
+    const jamBerakhir1Senmis = 7;
+    const menitBerakhir1Senmis = 34;
 
-    const jamMulai2Senmis = 15;
-    const menitMulai2Senmis = 45;
-    const jamBerakhir2Senmis = 16;
-    const menitBerakhir2Senmis = 15;
+    const jamMulai2Senmis = 7;
+    const menitMulai2Senmis = 35;
+    const jamBerakhir2Senmis = 7;
+    const menitBerakhir2Senmis = 45;
 
     let presensi = {};
     const currentHour = currentDate.hours();
@@ -514,7 +514,6 @@ async function deleteFotoProfil(req, res) {
 function hitungSisaWaktuMagang(req, res) {
   const id = req.params.id;
 
-  // Cari data peserta magang berdasarkan id
   models.Peserta_Magang.findByPk(id)
     .then((peserta) => {
       if (!peserta) {

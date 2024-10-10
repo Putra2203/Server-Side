@@ -23,10 +23,10 @@ module.exports = (sequelize, DataTypes) => {
     check_out: DataTypes.DATE,
     image_url_in: DataTypes.STRING,
     image_url_out: DataTypes.STRING,
-    latitude_in: DataTypes.DECIMAL(10, 8), // Kolom baru untuk latitude check-in
-    longitude_in: DataTypes.DECIMAL(11, 8), // Kolom baru untuk longitude check-in
-    latitude_out: DataTypes.DECIMAL(10, 8), // Kolom baru untuk latitude check-out
-    longitude_out: DataTypes.DECIMAL(11, 8), // Kolom baru untuk longitude check-out
+    latitude_in: DataTypes.DECIMAL(10, 8), 
+    longitude_in: DataTypes.DECIMAL(11, 8), 
+    latitude_out: DataTypes.DECIMAL(10, 8), 
+    longitude_out: DataTypes.DECIMAL(11, 8), 
     p_id: DataTypes.INTEGER
   }, {
     sequelize,

@@ -534,30 +534,38 @@ async function showPesertaAll(req, res) {
 }
 
 async function showPesertaAktifAll(req, res) {
-  statusCheck(req, res);
-  const response = await axios.get(
-    "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-  );
-  const currentDate = moment.tz(response.data.datetime, "Asia/Jakarta");
-  await models.Peserta_Magang.findAll({
-    where: {
-      status_aktif: 2,
-      tanggal_mulai: {
-        [Op.lte]: currentDate,
+  try {
+    statusCheck(req, res); // Pastikan statusCheck bekerja dengan baik
+    const response = await axios.get(
+      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
+    );
+    const currentDate = moment.tz(response.data.datetime, "Asia/Jakarta");
+
+    // Tambahkan log untuk memeriksa nilai currentDate
+    console.log("Current Date:", currentDate.format("YYYY-MM-DD"));
+
+    const result = await models.Peserta_Magang.findAll({
+      where: {
+        status_aktif: 2,
+        tanggal_mulai: {
+          [Op.lte]: currentDate,
+        },
       },
-    },
-  })
-    .then((result) => {
-      res.status(200).json({
-        peserta_magang: result,
-      });
-    })
-    .catch((error) => {
-      res.status(500).json({
-        message: "Something went wrong",
-        error: error,
-      });
     });
+
+    // Tambahkan log untuk melihat hasil query
+    console.log("Peserta Aktif:", result);
+
+    res.status(200).json({
+      peserta_magang: result,
+    });
+  } catch (error) {
+    console.error("Error fetching active participants:", error);
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error,
+    });
+  }
 }
 
 async function showPesertaAlumniAll(req, res) {
@@ -663,7 +671,7 @@ async function editPeserta(req, res) {
           no_telp_dosen: req.body.no_telp_dosen,
           tanggal_mulai: req.body.tanggal_mulai,
           tanggal_selesai: req.body.tanggal_selesai,
-          status_aktif: req.body.status_aktif
+          status_aktif: req.body.status_aktif,
         };
         if (req.body.password !== null) {
           updatedPeserta.password = hash;
@@ -1472,10 +1480,13 @@ async function exportStatusTugas(req, res) {
 
 async function exportPresensiPerTanggal(req, res) {
   try {
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const tanggal = moment.tz(response.data.datetime, "Asia/Jakarta");
+    // Ambil tanggal dari query parameter atau gunakan tanggal hari ini sebagai default
+    const searchDate = req.query.tanggal || moment().format("YYYY-MM-DD");
+
+    // Format tanggal menggunakan timezone Asia/Jakarta
+    const tanggal = moment.tz(searchDate, "Asia/Jakarta");
+
+    // Query data presensi berdasarkan tanggal yang sesuai
     const results = await models.Peserta_Magang.findAll({
       include: [
         {
@@ -1488,81 +1499,98 @@ async function exportPresensiPerTanggal(req, res) {
       ],
     });
 
+    if (results.length === 0) {
+      return res.status(404).json({
+        message: "Data presensi tidak ditemukan",
+      });
+    }
+
+    // Buat workbook baru
     const workbook = new exceljs.Workbook();
     const sheet = workbook.addWorksheet("Presensi");
+
+    // Definisikan kolom untuk file Excel
     sheet.columns = [
-      { header: "ID", key: "id", width: 3 },
       { header: "Nama", key: "nama", width: 30 },
-      { header: "Asal Universitas", key: "asal_univ", width: 30 },
-      { header: "Asal Jurusan", key: "asal_jurusan", width: 30 },
-      { header: "Nomor Telepon", key: "no_telp", width: 80 },
-      { header: "Tanggal Mulai", key: "tanggal_mulai", width: 30 },
-      { header: "Tanggal Selesai", key: "tanggal_selesai", width: 30 },
-      { header: "Status Aktif", key: "status_aktif", width: 30 },
-      { header: "Tanggal", key: "tanggal", width: 30 },
-      { header: "Check-In", key: "check_in", width: 30 },
-      { header: "Check-Out", key: "check_out", width: 30 },
-      { header: "Check-In Foto", key: "image_url_in", width: 50 },
-      { header: "Check-Out Foto", key: "image_url_out", width: 50 },
+      { header: "Asal Universitas", key: "asal_univ", width: 50 },
+      { header: "Asal Jurusan", key: "asal_jurusan", width: 50 },
+      { header: "Nomor Telepon", key: "no_telp", width: 15 },
+      { header: "Tanggal", key: "tanggal", width: 15 },
+      { header: "Check-In", key: "check_in", width: 20 },
+      { header: "Lokasi Check-In", key: "lokasi_in", width: 30 },
+      { header: "Check-Out", key: "check_out", width: 20 },
+      { header: "Lokasi Check-Out", key: "lokasi_out", width: 30 },
+      { header: "Foto Check-In", key: "image_url_in", width: 50 },
+      { header: "Foto Check-Out", key: "image_url_out", width: 50 },
     ];
 
+    // Isi data presensi ke dalam worksheet
     results.forEach((value) => {
-      const tanggalPresensi = value.presensimagang[0].tanggal;
-      const checkInPresensi = value.presensimagang[0].check_in
-        ? "Sudah Presensi"
-        : "Belum Presensi";
-      const checkOutPresensi = value.presensimagang[0].check_out
-        ? "Sudah Presensi"
-        : "Belum Presensi";
-      const imageInValue = value.presensimagang[0].image_url_in
-        ? image_url_in
-        : "Belum Presensi";
-      const imageOutValue = value.presensimagang[0].image_url_out
-        ? image_url_out
-        : "Belum Presensi";
+      value.presensimagang.forEach((presensi) => {
+        const checkInPresensi = presensi.check_in
+          ? moment(presensi.check_in).format("HH:mm:ss")
+          : "Belum Presensi";
+        const checkOutPresensi = presensi.check_out
+          ? moment(presensi.check_out).format("HH:mm:ss")
+          : "Belum Presensi";
 
-      // Function to set cell background color
-      function setCellBackgroundColor(value) {
-        return value === "Sudah Presensi" ? "FF00FF00" : "FFFFFFFF";
-      }
+        const lokasiIn =
+          presensi.latitude_in && presensi.longitude_in
+            ? `${presensi.latitude_in}, ${presensi.longitude_in}`
+            : "Lokasi tidak tersedia";
 
-      sheet.getCell(sheet.rowCount, sheet.getColumn("check_in").number).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: setCellBackgroundColor(checkInPresensi) },
-      };
-      sheet.getCell(sheet.rowCount, sheet.getColumn("check_out").number).fill =
-        {
+        const lokasiOut =
+          presensi.latitude_out && presensi.longitude_out
+            ? `${presensi.latitude_out}, ${presensi.longitude_out}`
+            : "Lokasi tidak tersedia";
+
+        const imageInValue = presensi.image_url_in || "Belum Presensi";
+        const imageOutValue = presensi.image_url_out || "Belum Presensi";
+
+        // Tambahkan baris baru
+        sheet.addRow({
+          nama: value.nama,
+          asal_univ: value.asal_univ,
+          asal_jurusan: value.asal_jurusan,
+          no_telp: value.no_telp,
+          tanggal: moment(presensi.tanggal).format("YYYY-MM-DD"),
+          check_in: checkInPresensi,
+          lokasi_in: lokasiIn,
+          check_out: checkOutPresensi,
+          lokasi_out: lokasiOut,
+          image_url_in: imageInValue,
+          image_url_out: imageOutValue,
+        });
+
+        // Set warna latar belakang untuk check-in dan check-out
+        const lastRow = sheet.lastRow;
+        lastRow.getCell("check_in").fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: setCellBackgroundColor(checkOutPresensi) },
+          fgColor: {
+            argb:
+              checkInPresensi === "Belum Presensi" ? "FFFF0000" : "FF00FF00",
+          }, // Merah jika belum presensi, hijau jika sudah
         };
-
-      sheet.addRow({
-        id: value.id,
-        nama: value.nama,
-        asal_univ: value.asal_univ,
-        asal_jurusan: value.asal_jurusan,
-        no_telp: value.no_telp,
-        tanggal_mulai: value.tanggal_mulai,
-        tanggal_selesai: value.tanggal_selesai,
-        status_aktif: value.status_aktif,
-        tanggal: tanggalPresensi,
-        check_in: checkInPresensi,
-        check_out: checkOutPresensi,
-        image_url_in: imageInValue,
-        image_url_out: imageOutValue,
+        lastRow.getCell("check_out").fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: {
+            argb:
+              checkOutPresensi === "Belum Presensi" ? "FFFF0000" : "FF00FF00",
+          }, // Merah jika belum presensi, hijau jika sudah
+        };
       });
     });
 
+    // Set header untuk mengirim file Excel
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
-
     res.setHeader(
       "Content-Disposition",
-      `attachment;filename=Presensi ${tanggal}.xlsx`
+      `attachment;filename=Presensi_${tanggal.format("YYYY-MM-DD")}.xlsx`
     );
 
     const buffer = await workbook.xlsx.writeBuffer();

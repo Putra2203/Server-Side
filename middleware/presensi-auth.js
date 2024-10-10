@@ -24,9 +24,9 @@ const protectUpload = async (req, res, next) => {
                 canUpload = true;
             }
         } else if (hari !== 0 && hari !== 6) {
-            if (isInRange(7, 45, 13, 15)) {
+            if (isInRange(7, 20, 7, 34)) {
                 canUpload = true;
-            } else if (isInRange(15, 45, 16, 15)) {
+            } else if (isInRange(7, 35, 7, 45)) {
                 canUpload = true;
             }
         }
