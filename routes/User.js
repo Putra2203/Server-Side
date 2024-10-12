@@ -25,7 +25,7 @@ router.patch(
     const uploadedFileUrl = req.file.path;
     userController.doTugas(req, res, uploadedFileUrl);
   }
-); //cek token
+); 
 router.get(
   "/presensi/:id",
   checkAuthMiddleware.checkAuth("peserta_magang"),
