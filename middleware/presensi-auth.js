@@ -1,10 +1,9 @@
-const axios = require('axios');
 const moment = require('moment-timezone');
 
 const protectUpload = async (req, res, next) => {
     try {
-        const response = await axios.get('https://worldtimeapi.org/api/timezone/Asia/Jakarta');
-        const time = moment.tz(response.data.datetime, 'Asia/Jakarta');
+        // Menggunakan waktu server lokal
+        const time = moment().tz('Asia/Jakarta');
         const hari = time.day();
         const currentHour = time.hours();
         const currentMinute = time.minutes();
@@ -26,7 +25,7 @@ const protectUpload = async (req, res, next) => {
         } else if (hari !== 0 && hari !== 6) {
             if (isInRange(7, 20, 7, 34)) {
                 canUpload = true;
-            } else if (isInRange(7, 35, 7, 45)) {
+            } else if (isInRange(7, 35, 22, 45)) {
                 canUpload = true;
             }
         }

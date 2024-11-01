@@ -1,7 +1,5 @@
-'use strict';
-const {
-  Model
-} = require('sequelize');
+"use strict";
+const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Peserta_Magang extends Model {
     /**
@@ -11,38 +9,43 @@ module.exports = (sequelize, DataTypes) => {
      */
     static associate(models) {
       Peserta_Magang.hasMany(models.Presensi, {
-        foreignKey: 'p_id', // Name of the foreign key in Presensi table
-        as: 'presensimagang', // Alias for the association
+        foreignKey: "p_id", // Name of the foreign key in Presensi table
+        as: "presensimagang", // Alias for the association
       });
       Peserta_Magang.hasMany(models.Status_tugas, {
-        foreignKey: 'p_id', // Name of the foreign key in Presensi table
-        as: 'status_tugas', // Alias for the association
+        foreignKey: "p_id", // Name of the foreign key in Presensi table
+        as: "status_tugas", // Alias for the association
       });
     }
   }
-  Peserta_Magang.init({
-    nama: DataTypes.STRING,
-    asal_univ: DataTypes.STRING,
-    asal_jurusan: DataTypes.STRING,
-    no_telp : DataTypes.STRING,
-    nama_dosen : DataTypes.STRING,
-    no_telp_dosen : DataTypes.STRING,
-    tanggal_mulai: DataTypes.DATEONLY,
-    tanggal_selesai: DataTypes.DATEONLY,
-    status_aktif: {
-      type: DataTypes.INTEGER, 
-      allowNull: false,       
-      validate: {
-        isIn: [[1, 2, 3]],
-      }
+  Peserta_Magang.init(
+    {
+      nama: DataTypes.STRING,
+      asal_univ: DataTypes.STRING,
+      asal_jurusan: DataTypes.STRING,
+      no_telp: DataTypes.STRING,
+      nama_dosen: DataTypes.STRING,
+      no_telp_dosen: DataTypes.STRING,
+      tanggal_mulai: DataTypes.DATEONLY,
+      tanggal_selesai: DataTypes.DATEONLY,
+      status_aktif: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        validate: {
+          isIn: [[1, 2, 3]],
+        },
+      },
+      penempatan: DataTypes.STRING,
+      foto_profil: DataTypes.STRING,
+      username: DataTypes.STRING,
+      password: DataTypes.STRING,
+      refreshTokens: DataTypes.STRING,
     },
-    foto_profil: DataTypes.STRING,
-    username: DataTypes.STRING,
-    password: DataTypes.STRING,
-    refreshTokens: DataTypes.STRING    
-  }, {
-    sequelize,
-    modelName: 'Peserta_Magang',
-  });
+    {
+      sequelize,
+      modelName: "Peserta_Magang",
+    }
+  );
+
   return Peserta_Magang;
 };

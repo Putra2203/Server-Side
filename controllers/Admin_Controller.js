@@ -349,6 +349,11 @@ async function addPeserta(req, res) {
                   salt,
                   async function (err, hash) {
                     try {
+                      const penempatanValue =
+                        req.body.penempatan === "special"
+                          ? req.body.specialPenempatan
+                          : req.body.penempatan;
+
                       const peserta_magang = {
                         nama: req.body.nama,
                         username: req.body.username,
@@ -361,10 +366,10 @@ async function addPeserta(req, res) {
                         tanggal_mulai: req.body.tanggal_mulai,
                         tanggal_selesai: req.body.tanggal_selesai,
                         status_aktif: req.body.status_aktif,
+                        penempatan: penempatanValue, // Use adjusted penempatan value
                       };
+
                       const isDateOnly = (value) => {
-                        // Add your custom validation logic here to check if the value is a date without a time component
-                        // For example, you can use a regular expression to match date-only format (YYYY-MM-DD)
                         const dateOnlyRegex = /^\d{4}-\d{2}-\d{2}$/;
                         return dateOnlyRegex.test(value);
                       };
@@ -406,7 +411,59 @@ async function addPeserta(req, res) {
                           optional: false,
                           enum: [1, 2, 3],
                         },
+                        penempatan: {
+                          type: "string",
+                          optional: false,
+                          custom: (value, errors) => {
+                            const allowedValues = [
+                              "Bidang 1",
+                              "Bidang 2",
+                              "Bidang 3",
+                              "Bidang 4",
+                              "Bidang 5",
+                              "Kesekretariatan",
+                            ];
+                            if (
+                              req.body.penempatan === "special" &&
+                              (!req.body.specialPenempatan ||
+                                req.body.specialPenempatan.trim() === "")
+                            ) {
+                              errors.push({
+                                message:
+                                  "Penempatan khusus harus diisi jika 'special' dipilih",
+                              });
+                            } else if (
+                              req.body.penempatan !== "special" &&
+                              !allowedValues.includes(value)
+                            ) {
+                              errors.push({
+                                type: "stringEnum",
+                                actual: value,
+                                expected: [...allowedValues, "special"],
+                              });
+                            }
+                            return value;
+                          },
+                        },
+                        specialPenempatan: {
+                          type: "string",
+                          optional: true,
+                          max: 50,
+                          custom: (value, errors) => {
+                            if (
+                              req.body.penempatan === "special" &&
+                              (!value || value.trim() === "")
+                            ) {
+                              errors.push({
+                                message:
+                                  "Penempatan khusus harus diisi jika 'special' dipilih",
+                              });
+                            }
+                            return value;
+                          },
+                        },
                       };
+
                       const v = new Validator();
                       const validationResponse = v.validate(
                         peserta_magang,
@@ -536,10 +593,9 @@ async function showPesertaAll(req, res) {
 async function showPesertaAktifAll(req, res) {
   try {
     statusCheck(req, res); // Pastikan statusCheck bekerja dengan baik
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const currentDate = moment.tz(response.data.datetime, "Asia/Jakarta");
+
+    // Menggunakan waktu server lokal
+    const currentDate = moment().tz("Asia/Jakarta");
 
     // Tambahkan log untuk memeriksa nilai currentDate
     console.log("Current Date:", currentDate.format("YYYY-MM-DD"));
@@ -548,7 +604,7 @@ async function showPesertaAktifAll(req, res) {
       where: {
         status_aktif: 2,
         tanggal_mulai: {
-          [Op.lte]: currentDate,
+          [Op.lte]: currentDate.toDate(),
         },
       },
     });
@@ -585,30 +641,31 @@ async function showPesertaAlumniAll(req, res) {
 }
 
 async function showCalonPesertaAll(req, res) {
-  statusCheck(req, res);
-  const response = await axios.get(
-    "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-  );
-  const currentDate = moment.tz(response.data.datetime, "Asia/Jakarta"); // Get the current date and time
-  await models.Peserta_Magang.findAll({
-    where: {
-      status_aktif: 3,
-      tanggal_mulai: {
-        [Op.gt]: currentDate, // [Op.lt] stands for less than
+  try {
+    statusCheck(req, res);
+
+    // Menggunakan waktu server lokal
+    const currentDate = moment().tz("Asia/Jakarta");
+
+    const result = await models.Peserta_Magang.findAll({
+      where: {
+        status_aktif: 3,
+        tanggal_mulai: {
+          [Op.gt]: currentDate.toDate(), // [Op.gt] stands for greater than
+        },
       },
-    },
-  })
-    .then((result) => {
-      res.status(200).json({
-        peserta_magang: result,
-      });
-    })
-    .catch((error) => {
-      res.status(500).json({
-        message: "Something went wrong",
-        error: error,
-      });
     });
+
+    res.status(200).json({
+      peserta_magang: result,
+    });
+  } catch (error) {
+    console.error("An error occurred:", error);
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error,
+    });
+  }
 }
 
 async function editPresensiForPeserta(result_peserta, id, req, res) {
@@ -657,80 +714,123 @@ async function editPresensiForPeserta(result_peserta, id, req, res) {
 }
 
 async function editPeserta(req, res) {
-  bcryptjs.genSalt(10, async function (err, salt) {
-    bcryptjs.hash(req.body.password, salt, async function (err, hash) {
-      try {
-        const id = req.params.id;
-        const updatedPeserta = {
-          nama: req.body.nama,
-          username: req.body.username,
-          asal_univ: req.body.asal_univ,
-          asal_jurusan: req.body.asal_jurusan,
-          no_telp: req.body.no_telp,
-          nama_dosen: req.body.nama_dosen,
-          no_telp_dosen: req.body.no_telp_dosen,
-          tanggal_mulai: req.body.tanggal_mulai,
-          tanggal_selesai: req.body.tanggal_selesai,
-          status_aktif: req.body.status_aktif,
-        };
-        if (req.body.password !== null) {
-          updatedPeserta.password = hash;
-        }
+  const id = req.params.id;
 
-        const isDateOnly = (value) => {
-          // Add your custom validation logic here to check if the value is a date without a time component
-          // For example, you can use a regular expression to match date-only format (YYYY-MM-DD)
-          const dateOnlyRegex = /^\d{4}-\d{2}-\d{2}$/;
-          return dateOnlyRegex.test(value);
-        };
+  try {
+    const penempatanValue =
+      req.body.penempatan === "special"
+        ? req.body.specialPenempatan
+        : req.body.penempatan;
 
-        const schema = {
-          nama: { type: "string", optional: true, max: 50 },
-          username: { type: "string", optional: true, max: 50 },
-          password: { type: "string", optional: true },
-          asal_univ: { type: "string", optional: true, max: 50 },
-          no_telp: { type: "string", optional: true, max: 50 },
-          nama_dosen: { type: "string", optional: true, max: 50 },
-          no_telp_dosen: { type: "string", optional: true, max: 50 },
-          asal_jurusan: { type: "string", optional: true, max: 50 },
-          tanggal_mulai: {
-            type: "custom",
-            messages: { custom: "Invalid date format" },
-            check: isDateOnly,
-          },
-          tanggal_selesai: {
-            type: "custom",
-            messages: { custom: "Invalid date format" },
-            check: isDateOnly,
-          },
-          status_aktif: {
-            type: "number",
-            integer: true,
-            optional: false,
-            enum: [1, 2, 3],
-          },
-        };
-        const v = new Validator();
-        const validationResponse = v.validate(updatedPeserta, schema);
+    const updatedPeserta = {
+      nama: req.body.nama,
+      username: req.body.username,
+      asal_univ: req.body.asal_univ,
+      no_telp: req.body.no_telp,
+      asal_jurusan: req.body.asal_jurusan,
+      nama_dosen: req.body.nama_dosen,
+      no_telp_dosen: req.body.no_telp_dosen,
+      tanggal_mulai: req.body.tanggal_mulai,
+      tanggal_selesai: req.body.tanggal_selesai,
+      status_aktif: req.body.status_aktif,
+      penempatan: penempatanValue,
+    };
 
-        if (validationResponse !== true) {
-          return res.status(400).json({
-            message: "Validation false",
-            errors: validationResponse,
-          });
-        }
-        await models.Peserta_Magang.update(updatedPeserta, {
-          where: { id: id },
-        });
-        await editPresensiForPeserta(updatedPeserta, id, req, res);
-      } catch (error) {
-        res.status(500).json({
-          message: "Something went wrong",
-          error: error,
-        });
-      }
+    const isDateOnly = (value) => {
+      const dateOnlyRegex = /^\d{4}-\d{2}-\d{2}$/;
+      return dateOnlyRegex.test(value);
+    };
+
+    const schema = {
+      nama: { type: "string", optional: false, max: 50 },
+      username: { type: "string", optional: false, max: 50 },
+      asal_univ: { type: "string", optional: false, max: 50 },
+      asal_jurusan: { type: "string", optional: false, max: 50 },
+      no_telp: { type: "string", optional: false, max: 50 },
+      nama_dosen: { type: "string", optional: false, max: 50 },
+      no_telp_dosen: { type: "string", optional: false, max: 50 },
+      tanggal_mulai: {
+        type: "custom",
+        messages: { custom: "Invalid date format" },
+        check: isDateOnly,
+      },
+      tanggal_selesai: {
+        type: "custom",
+        messages: { custom: "Invalid date format" },
+        check: isDateOnly,
+      },
+      status_aktif: {
+        type: "number",
+        integer: true,
+        optional: false,
+        enum: [1, 2, 3],
+      },
+      penempatan: {
+        type: "string",
+        optional: false,
+        custom: (value, errors) => {
+          const allowedValues = [
+            "Bidang 1",
+            "Bidang 2",
+            "Bidang 3",
+            "Bidang 4",
+            "Bidang 5",
+            "Kesekretariatan",
+          ];
+          if (
+            req.body.penempatan !== "special" &&
+            !allowedValues.includes(value)
+          ) {
+            errors.push({
+              type: "stringEnum",
+              actual: value,
+              expected: [...allowedValues, "special"],
+            });
+          }
+          return value;
+        },
+      },
+      specialPenempatan: {
+        type: "string",
+        optional: true,
+        custom: (value, errors) => {
+          if (
+            req.body.penempatan === "special" &&
+            (!value || value.trim() === "")
+          ) {
+            errors.push({
+              message: "Penempatan khusus harus diisi jika 'special' dipilih",
+            });
+          }
+          return value;
+        },
+      },
+    };
+
+    const v = new Validator();
+    const validationResponse = v.validate(updatedPeserta, schema);
+
+    if (validationResponse !== true) {
+      return res.status(400).json({
+        message: "Validation false",
+        errors: validationResponse,
+      });
+    } else {
+      delete updatedPeserta.specialPenempatan;
+
+      // Update record Peserta_Magang di database
+      await models.Peserta_Magang.update(updatedPeserta, {
+        where: { id: id },
+      });
+
+      res.status(200).json({ message: "Peserta updated successfully" });
+    }
+  } catch (error) {
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error.message || error,
     });
-  });
+  }
 }
 
 function deletePeserta(req, res) {
@@ -761,14 +861,12 @@ function deletePeserta(req, res) {
 }
 
 async function showPresensiPerDay(req, res) {
-  const response = await axios.get(
-    "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-  );
-  const tanggal = req.query.tanggal
-    ? moment.tz(req.query.tanggal, "Asia/Jakarta")
-    : moment.tz(response.data.datetime, "Asia/Jakarta");
-
   try {
+    // Menggunakan waktu server lokal jika tanggal tidak disediakan dalam query
+    const tanggal = req.query.tanggal
+      ? moment.tz(req.query.tanggal, "Asia/Jakarta")
+      : moment().tz("Asia/Jakarta");
+
     const presensi = await models.Peserta_Magang.findAll({
       include: [
         {
@@ -796,6 +894,7 @@ async function showPresensiPerDay(req, res) {
       totalSudahPresensi: totalSudahPresensi,
     });
   } catch (error) {
+    console.error("An error occurred:", error);
     res.status(500).json({
       message: "Something went wrong",
       error: error,
@@ -805,12 +904,10 @@ async function showPresensiPerDay(req, res) {
 
 async function showPresensiBelum(req, res) {
   try {
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
+    // Menggunakan waktu server lokal jika tanggal tidak disediakan dalam request
     const tanggal = req.body.tanggal
       ? moment.tz(req.body.tanggal, "Asia/Jakarta")
-      : moment.tz(response.data.datetime, "Asia/Jakarta");
+      : moment().tz("Asia/Jakarta");
 
     const presensi = await models.Peserta_Magang.findAll({
       include: [
@@ -1146,10 +1243,8 @@ async function exportPeserta(req, res) {
       }
     };
 
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const tanggal = moment.tz(response.data.datetime, "Asia/Jakarta");
+    // Menggunakan waktu server lokal
+    const tanggal = moment().tz("Asia/Jakarta");
 
     const workbook = new exceljs.Workbook();
     const sheet = workbook.addWorksheet("Peserta Magangs");
@@ -1190,7 +1285,9 @@ async function exportPeserta(req, res) {
 
     res.setHeader(
       "Content-Disposition",
-      `attachment;filename=Peserta Magang (${tanggal}).xlsx`
+      `attachment;filename=Peserta Magang (${tanggal.format(
+        "YYYY-MM-DD HH:mm:ss"
+      )}).xlsx`
     );
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -1207,15 +1304,15 @@ async function exportPeserta(req, res) {
 async function exportPesertaAktif(req, res) {
   try {
     statusCheck(req, res);
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const tanggal = moment.tz(response.data.datetime, "Asia/Jakarta");
+
+    // Menggunakan waktu server lokal
+    const tanggal = moment().tz("Asia/Jakarta");
+
     const results = await models.Peserta_Magang.findAll({
       where: {
         status_aktif: 2,
         tanggal_mulai: {
-          [Op.lte]: tanggal,
+          [Op.lte]: tanggal.toDate(),
         },
       },
     });
@@ -1259,7 +1356,9 @@ async function exportPesertaAktif(req, res) {
 
     res.setHeader(
       "Content-Disposition",
-      `attachment;filename=Peserta Magang Aktif (${tanggal}).xlsx`
+      `attachment;filename=Peserta Magang Aktif (${tanggal.format(
+        "YYYY-MM-DD HH:mm:ss"
+      )}).xlsx`
     );
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -1281,10 +1380,8 @@ async function exportPesertaAlumni(req, res) {
     });
     //status_aktif:2
 
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const tanggal = moment.tz(response.data.datetime, "Asia/Jakarta");
+    // Menggunakan waktu server lokal
+    const tanggal = moment().tz("Asia/Jakarta");
 
     const workbook = new exceljs.Workbook();
     const sheet = workbook.addWorksheet("Peserta Magangs");
@@ -1325,7 +1422,9 @@ async function exportPesertaAlumni(req, res) {
 
     res.setHeader(
       "Content-Disposition",
-      `attachment;filename=Peserta Magang Alumni (${tanggal}).xlsx`
+      `attachment;filename=Peserta Magang Alumni (${tanggal.format(
+        "YYYY-MM-DD HH:mm:ss"
+      )}).xlsx`
     );
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -1342,10 +1441,10 @@ async function exportPesertaAlumni(req, res) {
 async function exportCalonPeserta(req, res) {
   try {
     statusCheck(req, res);
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const tanggal = moment.tz(response.data.datetime, "Asia/Jakarta");
+
+    // Menggunakan waktu server lokal
+    const tanggal = moment().tz("Asia/Jakarta");
+
     const results = await models.Peserta_Magang.findAll({
       where: {
         status_aktif: 3,
@@ -1391,7 +1490,9 @@ async function exportCalonPeserta(req, res) {
 
     res.setHeader(
       "Content-Disposition",
-      `attachment;filename=Calon Peserta Magang (${tanggal}).xlsx`
+      `attachment;filename=Calon Peserta Magang (${tanggal.format(
+        "YYYY-MM-DD HH:mm:ss"
+      )}).xlsx`
     );
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -1408,10 +1509,10 @@ async function exportCalonPeserta(req, res) {
 async function exportStatusTugas(req, res) {
   try {
     const tid = req.params.id;
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const tanggal = moment.tz(response.data.datetime, "Asia/Jakarta");
+
+    // Menggunakan waktu server lokal
+    const tanggal = moment().tz("Asia/Jakarta");
+
     const results = await models.Peserta_Magang.findAll({
       include: [
         {
@@ -1464,7 +1565,9 @@ async function exportStatusTugas(req, res) {
 
     res.setHeader(
       "Content-Disposition",
-      `attachment;filename=Status Tugas ${tanggal}.xlsx`
+      `attachment;filename=Status Tugas ${tanggal.format(
+        "YYYY-MM-DD HH:mm:ss"
+      )}.xlsx`
     );
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -1609,10 +1712,9 @@ async function exportPresensiPerPeserta(req, res) {
     const id = req.params.id;
     const results = await models.Presensi.findAll({ where: { p_id: id } });
     const ambilNama = await models.Peserta_Magang.findByPk(id);
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const tanggal = moment.tz(response.data.datetime, "Asia/Jakarta");
+
+    // Menggunakan waktu server lokal
+    const tanggal = moment().tz("Asia/Jakarta");
     const fileName = "Presensi " + ambilNama.nama;
 
     const workbook = new exceljs.Workbook();
@@ -1673,7 +1775,9 @@ async function exportPresensiPerPeserta(req, res) {
 
     res.setHeader(
       "Content-Disposition",
-      `attachment;filename=${fileName} ${tanggal}.xlsx`
+      `attachment;filename=${fileName} ${tanggal.format(
+        "YYYY-MM-DD HH:mm:ss"
+      )}.xlsx`
     );
 
     const buffer = await workbook.xlsx.writeBuffer();

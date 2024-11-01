@@ -149,17 +149,15 @@ function showPresensi(req, res) {
 
 async function doPresensi(req, res, url) {
   try {
-    const response = await axios.get(
-      "https://worldtimeapi.org/api/timezone/Asia/Jakarta"
-    );
-    const time = moment.tz(response.data.datetime, "Asia/Jakarta");
+    // Menggunakan waktu server lokal
+    const time = moment().tz("Asia/Jakarta");
     const pid = req.params.id;
     const baseUrl = "http://localhost:3000/";
     const fileName = url.replace("\\", "/");
     const { latitude, longitude } = req.body; // Mengambil latitude dan longitude
 
     const hari = time.day();
-    const currentDate = moment(time);
+    const currentDate = time;
 
     const jamMulai1Jumat = 7;
     const menitMulai1Jumat = 15;
@@ -178,7 +176,7 @@ async function doPresensi(req, res, url) {
 
     const jamMulai2Senmis = 7;
     const menitMulai2Senmis = 35;
-    const jamBerakhir2Senmis = 7;
+    const jamBerakhir2Senmis = 22;
     const menitBerakhir2Senmis = 45;
 
     let presensi = {};
@@ -206,8 +204,8 @@ async function doPresensi(req, res, url) {
         presensi = {
           check_in: currentDate,
           image_url_in: baseUrl + fileName,
-          latitude_in: latitude, // Menambahkan latitude_in
-          longitude_in: longitude, // Menambahkan longitude_in
+          latitude_in: latitude,
+          longitude_in: longitude,
         };
       } else if (
         isInRange(
@@ -220,11 +218,11 @@ async function doPresensi(req, res, url) {
         presensi = {
           check_out: currentDate,
           image_url_out: baseUrl + fileName,
-          latitude_out: latitude, // Menambahkan latitude_out
-          longitude_out: longitude, // Menambahkan longitude_out
+          latitude_out: latitude,
+          longitude_out: longitude,
         };
       }
-    } else if (hari !== 0 && hari !== 6) {
+    } else if (hari !== 0 ) {
       if (
         isInRange(
           jamMulai1Senmis,
@@ -236,8 +234,8 @@ async function doPresensi(req, res, url) {
         presensi = {
           check_in: currentDate,
           image_url_in: baseUrl + fileName,
-          latitude_in: latitude, // Menambahkan latitude_in
-          longitude_in: longitude, // Menambahkan longitude_in
+          latitude_in: latitude,
+          longitude_in: longitude,
         };
       } else if (
         isInRange(
@@ -250,28 +248,24 @@ async function doPresensi(req, res, url) {
         presensi = {
           check_out: currentDate,
           image_url_out: baseUrl + fileName,
-          latitude_out: latitude, // Menambahkan latitude_out
-          longitude_out: longitude, // Menambahkan longitude_out
+          latitude_out: latitude,
+          longitude_out: longitude,
         };
       }
     }
 
     if (Object.keys(presensi).length > 0) {
-      models.Presensi.update(presensi, {
-        where: { p_id: pid, tanggal: time.format("YYYY-MM-DD") },
-      })
-        .then((result) => {
-          res.status(201).json({
-            message: "Presensi successful",
-            result: result,
-          });
-        })
-        .catch((error) => {
-          res.status(500).json({
-            message: "Something went wrong",
-            error: error,
-          });
+      try {
+        const result = await models.Presensi.update(presensi, {
+          where: { p_id: pid, tanggal: time.format("YYYY-MM-DD") },
         });
+        res.status(201).json({
+          message: "Presensi successful",
+          result: result,
+        });
+      } catch (error) {
+        throw error;
+      }
     } else {
       res.status(400).json({
         message: "Diluar jam presensi yang ditentukan",
@@ -285,7 +279,6 @@ async function doPresensi(req, res, url) {
     });
   }
 }
-
 function doTugas(req, res, url) {
   const id = req.params.id;
   const tid = req.params.tid;
